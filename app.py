@@ -187,11 +187,11 @@ with st.sidebar:
 
 # Parking space allocation map
 with st.expander("Parking Space Allocation Map"):
-    st.image(r"data\11x17 RFP 061026_Page_1.png",use_container_width=True)
+    st.image(r"data/11x17 RFP 061026_Page_1.png",use_container_width=True)
 
 # Parking space allocation map
 with st.expander("Residential Parking Permit Map"):
-    st.image(r"data\11x17 RFP 061026_Page_3.png",use_container_width=True)
+    st.image(r"data/11x17 RFP 061026_Page_3.png",use_container_width=True)
 
 # =============================================================================
 # RUN FINANCIAL MODEL

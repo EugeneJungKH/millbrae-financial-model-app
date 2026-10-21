@@ -27,7 +27,7 @@ import pandas as pd
 
 # File Paths
 # demand distribution. used in adjust_demand_for_time_of_day
-demand_distribution = pd.read_excel(r"data\ULI Factors.xlsx", sheet_name="TOD Adjustments")
+demand_distribution = pd.read_excel(r"data/ULI Factors.xlsx", sheet_name="TOD Adjustments")
 
 """
 =============================================================================
@@ -84,9 +84,9 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
 # =============================================================================
 
     # read in raw parking duration data (based on segment)
-    seg_TO = pd.read_excel(r"data\Segments Pricing Calculations 06192024.xlsx", sheet_name="Raw")
+    seg_TO = pd.read_excel(r"data/Segments Pricing Calculations 06192024.xlsx", sheet_name="Raw")
     # read in segment key data that tells the type of parking each segment is
-    seg_key = pd.read_csv(r"data\segment_key.csv")
+    seg_key = pd.read_csv(r"data/segment_key.csv")
     # merge key data with segment data
     seg_TO = seg_TO.merge(right = seg_key[["Segment","park_type"]], left_on = "Segment", right_on = "Segment")
 
@@ -204,7 +204,7 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
 # =============================================================================
 
     # read in ULI factors
-    ULI_df = pd.read_excel(r"data\ULI Factors.xlsx")
+    ULI_df = pd.read_excel(r"data/ULI Factors.xlsx")
     monthly_df = ULI_df.copy()
     monthly_df["wkdy_revenue_hrly"] = wkdy_revenue.iloc[0]
     monthly_df["wkdy_revenue_daily"] = wkdy_revenue.iloc[1]
@@ -245,7 +245,7 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
 # =============================================================================
 # 7. Calculate Expenses
 # =============================================================================
-    expenses_df = pd.read_excel(r"data\Expenses.xlsx")
+    expenses_df = pd.read_excel(r"data/Expenses.xlsx")
     expense_scenario = expenses_df[(expenses_df["RPP Scenario"] ==RPP_mode)&(expenses_df["Parking Provider"] ==parking_operator)&(expenses_df["Parking Meter Type"] ==meter_type)]
 
     yoy_increase = expense_scenario["YOY Increase"].iloc[0] + 1
