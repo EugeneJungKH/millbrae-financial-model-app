@@ -152,7 +152,7 @@ with st.sidebar:
     rpp_price = st.number_input(
         "Annual RPP Rate ($/year)",
         min_value=0.00,
-        value=100.00,
+        value=50.00,
         step=5.00,
     )
 
