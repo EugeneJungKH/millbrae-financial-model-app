@@ -1,187 +1,304 @@
+"""
+Downtown Millbrae Financial Model Dashboard
+
+Purpose
+-------
+Interactive Streamlit dashboard used to test parking program scenarios
+and estimate annual revenues, expenses, and net income.
+
+The assumptions are stored separetly in:
+    assumptions.md
+
+The detailed financial calculations are stored separately in:
+    calculations.py -> financial_model_calculations()
+
+This file is primarily responsible for:
+    1. Collecting user inputs
+    2. Passing inputs to the financial model
+    3. Displaying model results
+    4. Visualizing revenue and expenses
+"""
+
+# import packages
 import streamlit as st
-import pandas as pd
+import plotly.graph_objects as go
 from datetime import time
-import numpy as np
 from calculations import financial_model_calculations
-import plotly.express as px
 
-
-st.title("Downtown Millbrae Financial Model Dashboard")
-"This dashboard was created to simulate different financial scenarios for Millbrae. Not many assumptions were used to build this model, so results should be interpreted with caution and only used for general magnitudes."
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+DASHBOARD_TITLE = "Downtown Millbrae Financial Model Dashboard"
+REVENUE_COLUMNS = [
+    "Hrly Revenue",
+    "Daily Revenue",
+    "Permit Revenue",
+    "RPP Revenue",
+]
+EXPENSE_COLUMNS = [
+    "Enforcement Costs",
+    "Parking Mngmt Costs",
+    "CapEX",
+]
+CURRENCY_COLUMNS = REVENUE_COLUMNS + EXPENSE_COLUMNS + [
+    "Total Revenue",
+    "Total Expenses",
+    "Net Income",
+]
+# =============================================================================
+# PAGE HEADER
+# =============================================================================
+st.title(DASHBOARD_TITLE)
+st.write(
+    """
+    This dashboard simulates different parking financial scenarios for
+    Downtown Millbrae. The model relies on a limited number of assumptions,
+    so results should be interpreted with caution and used primarily to
+    understand the general magnitude of potential financial impacts.
+    """
+)
+# =============================================================================
+# MODEL ASSUMPTIONS
+# =============================================================================
+with open("assumptions.md", "r", encoding="utf-8") as file:
+    assumptions = file.read()
 
 with st.expander("Assumptions"):
-    st.markdown("""
-    1. Data was collected on:
-        - Weekday: 5/4/23 (Thu)
-        - Weekend: 5/6/23 (Sat)
-    2. ULI Monthly factors were used to extrapolate data throughout the whole year (Same ULI factors were used from El Camino Financial Model)
-    3. Certain parking lots were not captured. For these parking counts were collected using near maps and extrapolated for the year
-    4. Assumed sessions that lasted longer than 2 hours on parking segments that are now assigned to 2h time limit parking are displaced to parking lots.
-    5. Assumes that people who park 0-1 hrs, pay for 1hr and same logic follows for subsequent hours
-    """)
-    st.write("")
+    st.markdown(assumptions)
 
-if "saved_scenarios" not in st.session_state:
-    st.session_state.saved_scenarios = []   
-
+# =============================================================================
+# SIDEBAR INPUTS
+# =============================================================================
 with st.sidebar:
-    st.header("Inputs")
+    st.header("Scenario Inputs")
 
-    # 0. Input Scenario Name
-    # scenario_name = st.text_input(
-    #     "Scenario Name",
-    #     placeholder="e.g. Baseline"
-    #     )
-    # 0. RPP mode
-    RPP_mode = st.pills("RPP Mode", ["Existing","Expanded"], default="Existing")
+    # -------------------------------------------------------------------------
+    # Parking Program
+    # -------------------------------------------------------------------------
+    st.subheader("Parking Program")
 
-    # 1. Parking Operator
-    parking_operator = st.selectbox("Select a Parking Operator", ["LAZ","ACE"])
+    rpp_mode = st.pills(
+        "RPP Mode",
+        options=["Existing", "Expanded"],
+        default="Existing",
+    )
 
-    # 2. Meter Type
-    meter_type = st.selectbox("Select a Paystation Type", ["Multi-Space","Single-Space","Dual-Head"])
-    
-    # # 3. Rate and Hrs of Operation
-    # wkdy_col, wkend_col = st.columns(2, border = True)
+    parking_operator = st.selectbox(
+        "Parking Operator",
+        options=["LAZ", "ACE", "In House"],
+    )
 
-    # 3a. Weekday Inputs
-    # with wkdy_col:
-    # st.header("Weekday")
-    # wkdy_offstreet_ = st.number_input("Cost of Parking ($/hr)", min_value=0.00, step=0.25)
-    wkdy_start_time = st.time_input("Start Time", format = "12h", key="wkdy_start", value =time(10,0), step =3600)
-    wkdy_end_time = st.time_input("End Time", format = "12h", key="wkdy_end", value =time(21,0), step =3600)
-    wkdy_start_time = wkdy_start_time.hour
-    wkdy_end_time = wkdy_end_time.hour
+    meter_type = st.selectbox(
+        "Paystation Type",
+        options=["Multi-Space", "Single-Space", "Dual-Head"],
+    )
 
-    wkend_start_time = wkdy_start_time
-    wkend_end_time = wkdy_end_time
-    # # 3b. Weekend Inputs
-    # with wkend_col:
-    #     st.header("Weekend")
-    #     wkend_price_choice = st.number_input("test", min_value=0.00, step=0.25)
-    #     wkend_start_time = st.time_input("Start Time", format = "12h", key="wkend_start", value =time(8,0), step =1800)
-    #     wkend_end_time = st.time_input("End Time", format = "12h", key="wkend_end",value =time(18,0), step=1800)
-    
-    wkdy_hrly_rate = st.number_input("Parking Hourly Rate", value=1.50)
-    wkend_hrly_rate = wkdy_hrly_rate
-    wkdy_daily_rate = st.number_input("Parking Lot Day Rate", value=10)
-    wkend_daily_rate = wkdy_daily_rate
-    permit_rate = st.number_input("Monthly Permit Rate", value=50)
-    # RPP Annual price
-    rpp_price = st.number_input("Yearly RPP Rate", value=100)
+    # -------------------------------------------------------------------------
+    # Parking Hours
+    # -------------------------------------------------------------------------
+    st.subheader("Hours of Operation")
+
+    weekday_start_time = st.time_input(
+        "Start Time",
+        value=time(10, 0),
+        format="12h",
+        step=3600,
+        key="weekday_start_time",
+    )
+
+    weekday_end_time = st.time_input(
+        "End Time",
+        value=time(21, 0),
+        format="12h",
+        step=3600,
+        key="weekday_end_time",
+    )
+
+    # The financial model currently expects integer hours rather than
+    # datetime.time objects.
+    weekday_start_hour = weekday_start_time.hour
+    weekday_end_hour = weekday_end_time.hour
+
+    # Weekend hours currently use the same assumptions as weekdays.
+    weekend_start_hour = weekday_start_hour
+    weekend_end_hour = weekday_end_hour
+
+    # -------------------------------------------------------------------------
+    # Parking Rates
+    # -------------------------------------------------------------------------
+    st.subheader("Parking Rates")
+
+    weekday_hourly_rate = st.number_input(
+        "Parking Hourly Rate ($/hr)",
+        min_value=0.00,
+        value=1.50,
+        step=0.25,
+    )
+
+    weekday_daily_rate = st.number_input(
+        "Parking Lot Daily Rate ($/day)",
+        min_value=0.00,
+        value=10.00,
+        step=1.00,
+    )
+
+    permit_rate = st.number_input(
+        "Monthly Permit Rate ($/month)",
+        min_value=0.00,
+        value=50.00,
+        step=5.00,
+    )
+
+    rpp_price = st.number_input(
+        "Annual RPP Rate ($/year)",
+        min_value=0.00,
+        value=100.00,
+        step=5.00,
+    )
+
+    # Weekend parking rates currently use the same assumptions as weekdays.
+    weekend_hourly_rate = weekday_hourly_rate
+    weekend_daily_rate = weekday_daily_rate
+
+    # -------------------------------------------------------------------------
+    # Advanced Settings
+    # -------------------------------------------------------------------------
 
     with st.expander("Advanced Settings"):
 
-        # inflation = st.number_input("Inflation (%)", value=3)
-        # inflation = inflation/100 + 1
-        # yearly_revenue_increase = st.number_input("Yearly Revenue Increase (%)", value=0.5)
-        # yearly_revenue_increase = yearly_revenue_increase/100 + 1
-        attrition_rate = st.number_input("Attrition Rate (%/$)", value=0.15)
-        time_range = st.radio("Time Range (years)", [3,5])
-        sunday_parking_bool = st.checkbox("Enable Sunday Parking", value=False)
+        attrition_rate = st.number_input(
+            "Attrition Rate (% per $1 increase)",
+            value=0.15,
+        )
 
-    if st.button("Save Scenario"):       
-        scenario = {
-            "Scenario": scenario_name,
-            "Operator": parking_operator,
-            "Meter Type": meter_type,
-            # "Rate": price_choice,
-            # "Year One Revenue": annual_revenue,
-            # "Annual Expenses": annual_expenses,
-            # "Net Revenue": net_revenue
-        }
+        time_range = st.radio(
+            "Analysis Period (years)",
+            options=[3, 5],
+        )
 
-        st.session_state.saved_scenarios.append(scenario)
+        sunday_parking_enabled = st.checkbox(
+            "Enable Sunday Parking",
+            value=False,
+        )
 
-        st.success("Scenario saved!") 
+# =============================================================================
+# MAP
+# =============================================================================
 
-with st.expander("Map"):
-    st.map(latitude = 37.5991, longitude = -122.3995)
-# st.subheader("Scenario Comparison")
+# Parking space allocation map
+with st.expander("Parking Space Allocation Map"):
+    st.image(r"data\11x17 RFP 061026_Page_1.png",use_container_width=True)
 
-# if st.session_state.saved_scenarios:
+# Parking space allocation map
+with st.expander("Residential Parking Permit Map"):
+    st.image(r"data\11x17 RFP 061026_Page_3.png",use_container_width=True)
 
-#     comparison_df = pd.DataFrame(
-#         st.session_state.saved_scenarios
-#     )
+# =============================================================================
+# RUN FINANCIAL MODEL
+# =============================================================================
 
-#     st.dataframe(
-#         comparison_df,
-#         hide_index=True,
-#         width="stretch"
-#     )
+yearly_results = financial_model_calculations(
+    parking_operator,
+    rpp_mode,
+    rpp_price,
+    meter_type,
+    time_range,
+    sunday_parking_enabled,
+    attrition_rate,
+    permit_rate,
+    weekday_hourly_rate,
+    weekday_daily_rate,
+    weekday_start_hour,
+    weekday_end_hour,
+    weekend_hourly_rate,
+    weekend_daily_rate,
+    weekend_start_hour,
+    weekend_end_hour,
+)
 
-# else:
-#     st.info("Save a scenario to begin comparing options.")
 
-# if st.button("Clear Scenarios"):
-#     st.session_state.saved_scenarios = []
-#     st.rerun()
+# =============================================================================
+# RESULTS TABLE
+# =============================================================================
 
-# CALCULATIONS
-yearly_revenue_expenses = financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_type, time_range, sunday_parking_bool, attrition_rate, permit_rate, wkdy_hrly_rate, wkdy_daily_rate, wkdy_start_time, wkdy_end_time, wkend_hrly_rate,wkend_daily_rate, wkend_start_time, wkend_end_time)
+st.subheader("Financial Summary")
 
-# Summary Table
-st.dataframe(yearly_revenue_expenses.set_index("Years"),column_config={
-"Hrly Revenue": st.column_config.NumberColumn(format="dollar"),
-"Daily Revenue": st.column_config.NumberColumn(format="dollar"),
-"Permit Revenue": st.column_config.NumberColumn(format="dollar"),
-"RPP Revenue" : st.column_config.NumberColumn(format="dollar"),
-"Total Revenue": st.column_config.NumberColumn(format="dollar"),
-"Enforcement Costs": st.column_config.NumberColumn(format="dollar"),
-"Parking Mngmt Costs": st.column_config.NumberColumn(format="dollar"),
-"CapEX": st.column_config.NumberColumn(format="dollar"),
-"Total Expenses": st.column_config.NumberColumn(format="dollar"),
-"Net Income": st.column_config.NumberColumn(format="dollar"),})
+column_configuration = {
+    column: st.column_config.NumberColumn(format="dollar")
+    for column in CURRENCY_COLUMNS
+}
 
-import plotly.graph_objects as go
-revenue_cols = ["Hrly Revenue", "Daily Revenue", "Permit Revenue", "RPP Revenue"]
-expense_cols = ["Enforcement Costs", "Parking Mngmt Costs", "CapEX"]
+st.dataframe(
+    yearly_results.set_index("Years"),
+    column_config=column_configuration,
+    use_container_width=True,
+)
+
+
+# =============================================================================
+# REVENUE AND EXPENSE CHART
+# =============================================================================
+
+st.subheader("Annual Revenue and Expenses")
+
 fig = go.Figure()
 
-# Revenue components
-for col in revenue_cols:
+
+# Add stacked revenue components.
+for column in REVENUE_COLUMNS:
+
     fig.add_bar(
-        x=yearly_revenue_expenses["Years"],
-        y=yearly_revenue_expenses[col],
-        name=col,
+        x=yearly_results["Years"],
+        y=yearly_results[column],
+        name=column,
         offsetgroup="Revenue",
-        legendgroup="Revenue"
+        legendgroup="Revenue",
     )
 
-# Expense components
-for col in expense_cols:
+
+# Add stacked expense components.
+for column in EXPENSE_COLUMNS:
+
     fig.add_bar(
-        x=yearly_revenue_expenses["Years"],
-        y=yearly_revenue_expenses[col],
-        name=col,
+        x=yearly_results["Years"],
+        y=yearly_results[column],
+        name=column,
         offsetgroup="Expenses",
-        legendgroup="Expenses"
+        legendgroup="Expenses",
     )
 
-# Net Income labels
-for _, row in yearly_revenue_expenses.iterrows():
+
+# Add net income above each year's bars.
+for _, row in yearly_results.iterrows():
 
     net_income = row["Net Income"]
 
     if net_income < 0:
-        label = f'-${abs(net_income):,.0f}'
+        net_income_label = f"-${abs(net_income):,.0f}"
     else:
-        label = f'${net_income:,.0f}'
+        net_income_label = f"${net_income:,.0f}"
 
     fig.add_annotation(
         x=row["Years"],
-        y=max(row["Total Revenue"], row["Total Expenses"]),
-        text=label,
+        y=max(
+            row["Total Revenue"],
+            row["Total Expenses"],
+        ),
+        text=net_income_label,
         showarrow=False,
         yshift=15,
-        font=dict(size=12)
+        font=dict(size=12),
     )
+
 
 fig.update_layout(
     barmode="stack",
+    xaxis_title="Year",
     yaxis_title="Amount ($)",
-    xaxis_title="Year"
 )
 
-st.plotly_chart(fig, use_container_width=True)
+
+st.plotly_chart(
+    fig,
+    use_container_width=True,
+)

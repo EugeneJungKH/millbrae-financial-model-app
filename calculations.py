@@ -1,89 +1,110 @@
-import pandas as pd
+"""
+Downtown Millbrae Parking Financial Model
+
+Calculates parking demand, annual revenue, expenses, and net income for
+different parking-management scenarios.
+
+There are 3 functions:
+1. Demand Adjustement based on time of day
+    - Because demand data was collected only from 10am to 8pm. This function adjusts this demand data based on different time segments using ULI factors
+2. Split demand into hourly and daily parking
+    - Split demand into hourly and daily parking based on parking duration.
+
+Model process:
+1. Load and summarize parking-duration data.
+2. Adjust demand for the selected operating hours.
+3. Divide demand into hourly and daily parking categories.
+4. Apply parking-rate attrition.
+5. Annualize revenue using ULI monthly factors.
+6. Calculate revenue
+7. Calucalte Expenses
+"""
+
+# import packages
+from pathlib import Path
 import numpy as np
+import pandas as pd
 
-# Functions to adjust demand based on time of day
-def adjust_demand_for_time_of_day(start_time, end_time, demand, weekdayorweekend):
-    # Inputs:
-        # start_time: the start time of paid parking
-        # end_time: the end time of paid parking
-        # demand: series with demand
-        # weekdayorweekend: indicator for whether the demand is for a weekday or weekend
-    # Constants
-        # demand_distribution: distribution of demand across a 24 hour period
-    # Outputs:
-        # adjusted_demand: the demand adjusted for the time of day
+# File Paths
+# demand distribution. used in adjust_demand_for_time_of_day
+demand_distribution = pd.read_excel(r"data\ULI Factors.xlsx", sheet_name="TOD Adjustments")
 
-    demand_distribution = pd.read_excel(r"data\ULI Factors.xlsx", sheet_name="TOD Adjustments")
-    # calculate TOD factor for the base data
-    data_collection_start_time = 10 #10am
-    data_collection_end_time = 20 #8pm
-    # filter TOD factor so it only includes data from data collection start time to end time
-    data_collection_distribution = demand_distribution[(demand_distribution["TOD"] >= data_collection_start_time)&(demand_distribution["TOD"] <= data_collection_end_time)]
-    # add up to get the base data TOD factor 
-    base_data_TOD_factor = data_collection_distribution[f"{weekdayorweekend} Normalized TOD Demand"].sum()
+"""
+=============================================================================
+FUNCTION 1. ADJUST DEMAND BASED ON TIME OF DAY
+=============================================================================
+"""
+def adjust_demand_for_time_of_day(start_time, end_time, demand, day_type):
+    """Adjust observed parking demand (10 AM-8 PM) to the selected paid parking hours using ULI time-of-day factors."""
 
-    # calculate TOD factor for user input time range
-    user_input_distribution = demand_distribution[(demand_distribution["TOD"] >= start_time)&(demand_distribution["TOD"] <= end_time)]
-    user_input_TOD_factor = user_input_distribution[f"{weekdayorweekend} Normalized TOD Demand"].sum()
+    # Original data collection period
+    data_collection_start = 10  # 10 AM
+    data_collection_end = 20    # 8 PM
 
-    # calculate the demand for the user input time range
-    adjusted_demand = demand * (user_input_TOD_factor / base_data_TOD_factor)
+    # Calculate demand factor for original data collection period
+    base_period = demand_distribution[(demand_distribution["TOD"] >= data_collection_start) & (demand_distribution["TOD"] <= data_collection_end)]
+    base_demand_factor = base_period[f"{day_type} Normalized TOD Demand"].sum()
 
-    # return the adjusted demand
+    # Calculate demand factor for selected paid parking period
+    selected_period = demand_distribution[(demand_distribution["TOD"] >= start_time) & (demand_distribution["TOD"] <= end_time)]
+    selected_demand_factor = selected_period[f"{day_type} Normalized TOD Demand"].sum()
+
+    # Adjust demand based on difference between the two periods
+    adjusted_demand = demand * (selected_demand_factor / base_demand_factor)
+
     return adjusted_demand
 
-def split_demand(hrs_parked,series,split_1,split_2):
-    split_series = pd.Series()
-    split_series.loc["Hrly"] = series.loc[hrs_parked <= split_1].sum()
-    split_series.loc["Daily"] = series.loc[(hrs_parked > split_1)&(hrs_parked <= split_2)].sum()
-    return split_series
+
+"""
+=============================================================================
+FUNCTION 2. SPLIT DEMAND INTO HOURLY AND DAILY PARKING
+=============================================================================
+"""
+def split_demand_by_rate(hours_parked, demand, hourly_limit, daily_limit):
+    """Split demand into hourly and daily parking based on parking duration."""
+
+    hourly_demand = demand[hours_parked <= hourly_limit].sum()
+    daily_demand = demand[(hours_parked > hourly_limit) & (hours_parked <= daily_limit)].sum()
+
+    return pd.Series({"Hrly": hourly_demand, "Daily": daily_demand})
 
 
+"""
+=============================================================================
+FUNCTION 3. MAIN CALCULATIONS
+=============================================================================
+"""
 
 def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_type, time_range, sunday_parking_bool, attrition_rate, permit_rate, 
                                  wkdy_hrly_rate, wkdy_daily_rate, wkdy_start_time, wkdy_end_time, 
                                  wkend_hrly_rate,wkend_daily_rate, wkend_start_time, wkend_end_time):
-    seg_TO_col = [
-    "Segment",
-    "TO_Sat_0-1 HRS",
-    "TO_Sat_1-2 HRS",
-    "TO_Sat_2-3 HRS",
-    "TO_Sat_3-4 HRS",
-    "TO_Sat_4-5 HRS",
-    "TO_Sat_5-6 HRS",
-    "TO_Sat_6-7 HRS",
-    "TO_Sat_7-8 HRS",
-    "TO_Sat_8-9 HRS",
-    "TO_Sat_9-10 HRS",
-    "TO_Thu_0-1 HRS",
-    "TO_Thu_1-2 HRS",
-    "TO_Thu_2-3 HRS",
-    "TO_Thu_3-4 HRS",
-    "TO_Thu_4-5 HRS",
-    "TO_Thu_5-6 HRS",
-    "TO_Thu_6-7 HRS",
-    "TO_Thu_7-8 HRS",
-    "TO_Thu_8-9 HRS",
-    "TO_Thu_9-10 HRS"]
 
-    # FORMAT DATA
+# =============================================================================
+# 1. Load and summarize parking-duration data.
+# =============================================================================
 
-    # read in segment data with parking duration data
+    # read in raw parking duration data (based on segment)
     seg_TO = pd.read_excel(r"data\Segments Pricing Calculations 06192024.xlsx", sheet_name="Raw")
     # read in segment key data that tells the type of parking each segment is
     seg_key = pd.read_csv(r"data\segment_key.csv")
     # merge key data with segment data
     seg_TO = seg_TO.merge(right = seg_key[["Segment","park_type"]], left_on = "Segment", right_on = "Segment")
 
-    # clean data
+    # Specify which columns to take from the parking duration data
+    seg_TO_col = [ "Segment", "TO_Sat_0-1 HRS", "TO_Sat_1-2 HRS","TO_Sat_2-3 HRS","TO_Sat_3-4 HRS","TO_Sat_4-5 HRS", "TO_Sat_5-6 HRS",
+    "TO_Sat_6-7 HRS","TO_Sat_7-8 HRS","TO_Sat_8-9 HRS","TO_Sat_9-10 HRS","TO_Thu_0-1 HRS","TO_Thu_1-2 HRS",
+    "TO_Thu_2-3 HRS","TO_Thu_3-4 HRS","TO_Thu_4-5 HRS","TO_Thu_5-6 HRS","TO_Thu_6-7 HRS","TO_Thu_7-8 HRS","TO_Thu_8-9 HRS",
+    "TO_Thu_9-10 HRS"]
     seg_TO_clean = seg_TO[seg_TO_col]
+
     # merge data with key to know zoning/ classificatoin
     seg_TO_key = seg_TO_clean.merge(seg_key[["Segment","park_type"]], left_on="Segment",right_on="Segment")
+
     # group data
     seg_TO_sum = seg_TO_key.drop(columns=["Segment"]).groupby("park_type").sum().T.reset_index()
 
     # create column for hrs parked
-    seg_TO_sum["hrs_parked"] = [0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,]
+    seg_TO_sum["hrs_parked"] = [0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5]
 
     # split the index for easier reference
     seg_TO_sum[["Turnover","DOW","length"]] = seg_TO_sum["index"].str.split(pat="_", expand = True)
@@ -91,8 +112,6 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     # reorganize columns for easier reference
     seg_TO_sum_clean = seg_TO_sum.copy()[["DOW","length","hrs_parked","All Day","2h","2h Free", "Lot"]]
     seg_TO_sum_clean
-
-    # Find the number of permit parkers
 
     # assume anyone parking for more than 6 hours is a permit parker
     seg_TO_sum_clean_lots = seg_TO_sum_clean[seg_TO_sum_clean["hrs_parked"]>6]
@@ -114,6 +133,10 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     wkdy_df = seg_TO_sum_clean.copy()[seg_TO_sum_clean["DOW"] == "Thu"]
     wkend_df = seg_TO_sum_clean.copy()[seg_TO_sum_clean["DOW"] == "Sat"]
 
+# =============================================================================
+# 2. Adjust demand for the selected operating hours.
+# =============================================================================
+
     # apply adjust_demand_for_time_of_day function to "All Day","2h","2h Free","Lot" columns
     wkdy_df["All Day TOD_Adj"] = adjust_demand_for_time_of_day(wkdy_start_time, wkdy_end_time, wkdy_df["All Day"], "Weekday") * wkdy_df["hrs_parked"]
     wkdy_df["2h TOD_Adj"] = adjust_demand_for_time_of_day(wkdy_start_time, wkdy_end_time, wkdy_df["2h"], "Weekday" )* wkdy_df["hrs_parked"]
@@ -134,56 +157,51 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     wkdy_df.iloc[:2, wkdy_df.columns.get_loc("Lot >2h")] = 0
     wkend_df.iloc[:2, wkend_df.columns.get_loc("Lot >2h")] = 0
 
+# =============================================================================
+# 3. Divide demand into hourly and daily parking categories.
+# =============================================================================
+
     # create a new data frame with hrly, daily, or permit as rows
     wkdy_park_type_df = pd.DataFrame()
 
     # calculate all the All Day TOD_Adj revenue for each parking type
-    wkdy_park_type_df["All Day"] = split_demand(wkdy_df["hrs_parked"], wkdy_df["All Day TOD_Adj"], 4, 6)
-    wkdy_park_type_df["2h"] = split_demand(wkdy_df["hrs_parked"], wkdy_df["2h TOD_Adj"], 2, 6)
-    wkdy_park_type_df["Lot"] = split_demand(wkdy_df["hrs_parked"], wkdy_df["Lot TOD_Adj"], 4, 6)
-    wkdy_park_type_df["Lot >2h"] = split_demand(wkdy_df["hrs_parked"], wkdy_df["Lot >2h"], 4, 6)
+    wkdy_park_type_df["All Day"] = split_demand_by_rate(wkdy_df["hrs_parked"], wkdy_df["All Day TOD_Adj"], 4, 6)
+    wkdy_park_type_df["2h"] = split_demand_by_rate(wkdy_df["hrs_parked"], wkdy_df["2h TOD_Adj"], 2, 6)
+    wkdy_park_type_df["Lot"] = split_demand_by_rate(wkdy_df["hrs_parked"], wkdy_df["Lot TOD_Adj"], 4, 6)
+    wkdy_park_type_df["Lot >2h"] = split_demand_by_rate(wkdy_df["hrs_parked"], wkdy_df["Lot >2h"], 4, 6)
 
     # repeat for weekend
     wkend_park_type_df = pd.DataFrame()
-    wkend_park_type_df["All Day"] = split_demand(wkend_df["hrs_parked"], wkend_df["All Day TOD_Adj"], 4, 6)
-    wkend_park_type_df["2h"] = split_demand(wkend_df["hrs_parked"], wkend_df["2h TOD_Adj"], 2, 6)
-    wkend_park_type_df["Lot"] = split_demand(wkend_df["hrs_parked"], wkend_df["Lot TOD_Adj"], 4, 6)
-    wkend_park_type_df["Lot >2h"] = split_demand(wkend_df["hrs_parked"], wkend_df["Lot >2h"], 4, 6)
+    wkend_park_type_df["All Day"] = split_demand_by_rate(wkend_df["hrs_parked"], wkend_df["All Day TOD_Adj"], 4, 6)
+    wkend_park_type_df["2h"] = split_demand_by_rate(wkend_df["hrs_parked"], wkend_df["2h TOD_Adj"], 2, 6)
+    wkend_park_type_df["Lot"] = split_demand_by_rate(wkend_df["hrs_parked"], wkend_df["Lot TOD_Adj"], 4, 6)
+    wkend_park_type_df["Lot >2h"] = split_demand_by_rate(wkend_df["hrs_parked"], wkend_df["Lot >2h"], 4, 6)
 
-    # Calculate Revenue and adjust for attrition
+# =============================================================================
+# 4. Apply parking-rate attrition.
+# =============================================================================
 
+    # create copies od df
     wkdy_revenue_df = wkdy_park_type_df.copy()
     wkend_revenue_df = wkend_park_type_df.copy()
 
-
-    # Adjust Demand Based on Attrition
-    # ==================================
     wkdy_daily_effective_hrly_rate = wkdy_daily_rate / (wkdy_end_time - wkdy_start_time)
     wkend_daily_effective_hrly_rate = wkend_daily_rate / (wkend_end_time - wkend_start_time)
 
     daily_sensitivity = 5
 
-
-
     wkdy_revenue_df.loc["Hrly"] *= max(0,1-attrition_rate*wkdy_hrly_rate) * wkdy_hrly_rate
     wkdy_revenue_df.loc["Daily"] *= max(0,1-attrition_rate*wkdy_daily_effective_hrly_rate*daily_sensitivity) * wkdy_daily_rate
 
-    # Adjust Weekend Demand Based on Attrition
-    # ==================================
-    wkend_revenue_df.loc["Hrly"] *= max(0,1-attrition_rate*wkend_hrly_rate) * wkend_hrly_rate
-    wkend_revenue_df.loc["Daily"] *= max(0,1-attrition_rate*wkend_daily_effective_hrly_rate*daily_sensitivity) * wkend_daily_rate
 
-    # add up df
-    # add up weekday revenue
     wkdy_revenue = wkdy_revenue_df.sum(axis=1)
 
     # add up weekend revenue
     wkend_revenue = wkend_revenue_df.sum(axis=1)
 
-
-    # convert weekday_seg_revenue into a yearly_revenue using ULI factors
-
-    # convert weekday_seg_revenue into a yearly_revenue using ULI factors
+# =============================================================================
+# 5. Annualize revenue using ULI monthly factors.
+# =============================================================================
 
     # read in ULI factors
     ULI_df = pd.read_excel(r"data\ULI Factors.xlsx")
@@ -203,7 +221,9 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     year_one_revenue_hrly = monthly_df["Total Monthly Revenue_hrly"].sum()
     year_one_revenue_daily = monthly_df["Total Monthly Revenue_daily"].sum()
 
-    # calculate permit revenue
+# =============================================================================
+# 6. Calculate Revenue
+# =============================================================================
     year_one_revenue_permit = permit_count_adjusted * permit_rate * 12
 
     # convert year revenue into multiple years
@@ -212,9 +232,7 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     yearly_revenue_expenses = pd.DataFrame()
     yearly_revenue_expenses["Years"] = years
 
-    # increase revenue annually, then convert to today's dollars
     year_index = np.arange(time_range)
-
     yearly_revenue_expenses["Hrly Revenue"] = year_one_revenue_hrly
     yearly_revenue_expenses["Daily Revenue"] = year_one_revenue_daily
     yearly_revenue_expenses["Permit Revenue"] = year_one_revenue_permit
@@ -224,9 +242,9 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
         year_one_revenue_RPP = rpp_price * 878/956 * 1489 # use same % of active RPP households * total households
     yearly_revenue_expenses["RPP Revenue"] = year_one_revenue_RPP
     yearly_revenue_expenses["Total Revenue"] = year_one_revenue_hrly + year_one_revenue_daily + year_one_revenue_permit + year_one_revenue_RPP
-
-
-    # expenses
+# =============================================================================
+# 7. Calculate Expenses
+# =============================================================================
     expenses_df = pd.read_excel(r"data\Expenses.xlsx")
     expense_scenario = expenses_df[(expenses_df["RPP Scenario"] ==RPP_mode)&(expenses_df["Parking Provider"] ==parking_operator)&(expenses_df["Parking Meter Type"] ==meter_type)]
 
