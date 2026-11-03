@@ -24,6 +24,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from datetime import time
 from calculations import financial_model_calculations
+from excel_export import build_excel_file
 
 # =============================================================================
 # CONFIGURATION
@@ -46,6 +47,16 @@ CURRENCY_COLUMNS = REVENUE_COLUMNS + EXPENSE_COLUMNS + [
     "Total Expenses",
     "Net Income",
 ]
+# Streamlit's default light theme chart colors, used for the Excel chart.
+COLUMN_COLORS = {
+    "Hrly Revenue": "#0068C9",
+    "Daily Revenue": "#83C9FF",
+    "Permit Revenue": "#FF2B2B",
+    "RPP Revenue": "#FFABAB",
+    "Enforcement Costs": "#29B09D",
+    "Parking Mngmt Costs": "#7DEFA1",
+    "CapEX": "#FF8700",
+}
 # =============================================================================
 # PAGE HEADER
 # =============================================================================
@@ -232,6 +243,19 @@ yearly_results = financial_model_calculations(
 # =============================================================================
 # RESULTS TABLE
 # =============================================================================
+
+st.download_button(
+    "Download Excel File",
+    data=build_excel_file(
+        yearly_results,
+        REVENUE_COLUMNS,
+        EXPENSE_COLUMNS,
+        CURRENCY_COLUMNS,
+        COLUMN_COLORS,
+    ),
+    file_name="millbrae_financial_summary.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+)
 
 st.subheader("Financial Summary")
 
