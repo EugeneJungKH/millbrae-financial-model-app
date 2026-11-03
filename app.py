@@ -147,11 +147,7 @@ with st.sidebar:
     weekday_daily_rate = DAILY_MAX_MULTIPLIER * weekday_offstreet_hourly_rate
 
     st.caption(
-<<<<<<< HEAD
         f"Off-street daily maximum: ${weekday_daily_rate:,.2f}/day "
-=======
-        f"Daily maximum: ${weekday_daily_rate:,.2f}/day "
->>>>>>> d782d9aa5e461264e6d35dcdf2a094d84ad8b238
         f"({DAILY_MAX_MULTIPLIER}x the off-street hourly rate)"
     )
 
