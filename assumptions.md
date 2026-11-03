@@ -15,8 +15,10 @@
 6. **Parking Duration:** For each parking duration category in the raw data (0-1 hr, 1-2hr, etc), parker are assumed to park for the midpoint of each category (0.5 hr, 1.5 hr, etc)
 
 7. **Hourly vs. Daily vs. Permit Parking:** Parking demand is divided into hourly, daily, and permit parking based on duration:
-   - All-day parking and parking lots: sessions up to 4 hours are treated as hourly parking; sessions longer than 4 hours and up to 6 hours are treated as daily parking.
-   - Two-hour parking: sessions up to 2 hours are treated as hourly parking; sessions longer than 2 hours and up to 6 hours are treated as daily parking.
+   - Parking lots (off-street): sessions up to 4 hours are treated as hourly parking; sessions longer than 4 hours and up to 6 hours are treated as daily parking.
+   - All-day parking (on-street): sessions up to 6 hours are treated as hourly parking.
+   - Two-hour parking (on-street): sessions up to 2 hours are treated as hourly parking; longer sessions are assumed to move to parking lots.
+   - Rates: on-street parking pays the on-street hourly rate; parking lots pay the off-street hourly rate. The daily maximum applies only to parking lots and is 4 times the off-street hourly rate.
 
 8. **Permit-Eligible Parking:** Permit parkers were based on the number parking sessions longer than 6 hours on Thursday. It was then adjusted assuming that 80% of workers present during the obsserved Thursday parking period.
 

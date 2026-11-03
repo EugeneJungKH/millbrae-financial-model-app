@@ -76,8 +76,8 @@ FUNCTION 3. MAIN CALCULATIONS
 """
 
 def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_type, time_range, sunday_parking_bool, attrition_rate, permit_rate, 
-                                 wkdy_hrly_rate, wkdy_daily_rate, wkdy_start_time, wkdy_end_time, 
-                                 wkend_hrly_rate,wkend_daily_rate, wkend_start_time, wkend_end_time):
+                                 wkdy_onstreet_hrly_rate, wkdy_offstreet_hrly_rate, wkdy_daily_rate, wkdy_start_time, wkdy_end_time,
+                                 wkend_onstreet_hrly_rate, wkend_offstreet_hrly_rate, wkend_daily_rate, wkend_start_time, wkend_end_time):
 
 # =============================================================================
 # 1. Load and summarize parking-duration data.
@@ -165,15 +165,17 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     wkdy_park_type_df = pd.DataFrame()
 
     # calculate all the All Day TOD_Adj revenue for each parking type
-    wkdy_park_type_df["All Day"] = split_demand_by_rate(wkdy_df["hrs_parked"], wkdy_df["All Day TOD_Adj"], 4, 6)
-    wkdy_park_type_df["2h"] = split_demand_by_rate(wkdy_df["hrs_parked"], wkdy_df["2h TOD_Adj"], 2, 6)
+    # the daily rate only applies off-street, so All Day and 2h have no daily demand
+    # 2h stays over 2 hours are already captured in Lot >2h
+    wkdy_park_type_df["All Day"] = split_demand_by_rate(wkdy_df["hrs_parked"], wkdy_df["All Day TOD_Adj"], 6, 6)
+    wkdy_park_type_df["2h"] = split_demand_by_rate(wkdy_df["hrs_parked"], wkdy_df["2h TOD_Adj"], 2, 2)
     wkdy_park_type_df["Lot"] = split_demand_by_rate(wkdy_df["hrs_parked"], wkdy_df["Lot TOD_Adj"], 4, 6)
     wkdy_park_type_df["Lot >2h"] = split_demand_by_rate(wkdy_df["hrs_parked"], wkdy_df["Lot >2h"], 4, 6)
 
     # repeat for weekend
     wkend_park_type_df = pd.DataFrame()
-    wkend_park_type_df["All Day"] = split_demand_by_rate(wkend_df["hrs_parked"], wkend_df["All Day TOD_Adj"], 4, 6)
-    wkend_park_type_df["2h"] = split_demand_by_rate(wkend_df["hrs_parked"], wkend_df["2h TOD_Adj"], 2, 6)
+    wkend_park_type_df["All Day"] = split_demand_by_rate(wkend_df["hrs_parked"], wkend_df["All Day TOD_Adj"], 6, 6)
+    wkend_park_type_df["2h"] = split_demand_by_rate(wkend_df["hrs_parked"], wkend_df["2h TOD_Adj"], 2, 2)
     wkend_park_type_df["Lot"] = split_demand_by_rate(wkend_df["hrs_parked"], wkend_df["Lot TOD_Adj"], 4, 6)
     wkend_park_type_df["Lot >2h"] = split_demand_by_rate(wkend_df["hrs_parked"], wkend_df["Lot >2h"], 4, 6)
 
@@ -190,7 +192,9 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
 
     daily_sensitivity = 5
 
-    wkdy_revenue_df.loc["Hrly"] *= max(0,1-attrition_rate*wkdy_hrly_rate) * wkdy_hrly_rate
+    # All Day and 2h segments are on-street. Lot and Lot >2h are off-street
+    wkdy_revenue_df.loc["Hrly", ["All Day","2h"]] *= max(0,1-attrition_rate*wkdy_onstreet_hrly_rate) * wkdy_onstreet_hrly_rate
+    wkdy_revenue_df.loc["Hrly", ["Lot","Lot >2h"]] *= max(0,1-attrition_rate*wkdy_offstreet_hrly_rate) * wkdy_offstreet_hrly_rate
     wkdy_revenue_df.loc["Daily"] *= max(0,1-attrition_rate*wkdy_daily_effective_hrly_rate*daily_sensitivity) * wkdy_daily_rate
 
 

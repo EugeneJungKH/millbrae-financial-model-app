@@ -29,6 +29,7 @@ from calculations import financial_model_calculations
 # CONFIGURATION
 # =============================================================================
 DASHBOARD_TITLE = "Downtown Millbrae Financial Model Dashboard"
+DAILY_MAX_MULTIPLIER = 4
 REVENUE_COLUMNS = [
     "Hrly Revenue",
     "Daily Revenue",
@@ -128,18 +129,26 @@ with st.sidebar:
     # -------------------------------------------------------------------------
     st.subheader("Parking Rates")
 
-    weekday_hourly_rate = st.number_input(
-        "Parking Hourly Rate ($/hr)",
+    weekday_onstreet_hourly_rate = st.number_input(
+        "On-Street Hourly Rate ($/hr)",
+        min_value=0.00,
+        value=1.00,
+        step=0.25,
+    )
+
+    weekday_offstreet_hourly_rate = st.number_input(
+        "Off-Street Hourly Rate ($/hr)",
         min_value=0.00,
         value=1.50,
         step=0.25,
     )
 
-    weekday_daily_rate = st.number_input(
-        "Parking Lot Daily Rate ($/day)",
-        min_value=0.00,
-        value=10.00,
-        step=1.00,
+    # The daily maximum is derived from the off-street hourly rate.
+    weekday_daily_rate = DAILY_MAX_MULTIPLIER * weekday_offstreet_hourly_rate
+
+    st.caption(
+        f"Off-street daily maximum: ${weekday_daily_rate:,.2f}/day "
+        f"({DAILY_MAX_MULTIPLIER}x the off-street hourly rate)"
     )
 
     permit_rate = st.number_input(
@@ -157,7 +166,8 @@ with st.sidebar:
     )
 
     # Weekend parking rates currently use the same assumptions as weekdays.
-    weekend_hourly_rate = weekday_hourly_rate
+    weekend_onstreet_hourly_rate = weekday_onstreet_hourly_rate
+    weekend_offstreet_hourly_rate = weekday_offstreet_hourly_rate
     weekend_daily_rate = weekday_daily_rate
 
     # -------------------------------------------------------------------------
@@ -206,11 +216,13 @@ yearly_results = financial_model_calculations(
     sunday_parking_enabled,
     attrition_rate,
     permit_rate,
-    weekday_hourly_rate,
+    weekday_onstreet_hourly_rate,
+    weekday_offstreet_hourly_rate,
     weekday_daily_rate,
     weekday_start_hour,
     weekday_end_hour,
-    weekend_hourly_rate,
+    weekend_onstreet_hourly_rate,
+    weekend_offstreet_hourly_rate,
     weekend_daily_rate,
     weekend_start_hour,
     weekend_end_hour,
