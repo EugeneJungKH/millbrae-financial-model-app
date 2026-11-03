@@ -64,6 +64,7 @@ def split_demand_by_rate(hours_parked, demand, hourly_limit, daily_limit):
     """Split demand into hourly and daily parking based on parking duration."""
 
     hourly_demand = demand[hours_parked <= hourly_limit].sum()
+    # @EugeneJungKH change daily_demand to be number of vehicles, not vehicle-hours
     daily_demand = demand[(hours_parked > hourly_limit) & (hours_parked <= daily_limit)].sum()
 
     return pd.Series({"Hrly": hourly_demand, "Daily": daily_demand})
@@ -197,10 +198,10 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     wkdy_revenue_df.loc["Hrly", ["Lot","Lot >2h"]] *= max(0,1-attrition_rate*wkdy_offstreet_hrly_rate) * wkdy_offstreet_hrly_rate
     wkdy_revenue_df.loc["Daily"] *= max(0,1-attrition_rate*wkdy_daily_effective_hrly_rate*daily_sensitivity) * wkdy_daily_rate
 
-
     wkdy_revenue = wkdy_revenue_df.sum(axis=1)
 
     # add up weekend revenue
+    # @EugeneJungKH repeat the weekday calculations for weekend
     wkend_revenue = wkend_revenue_df.sum(axis=1)
 
 # =============================================================================
