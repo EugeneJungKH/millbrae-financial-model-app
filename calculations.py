@@ -76,8 +76,8 @@ FUNCTION 3. MAIN CALCULATIONS
 """
 
 def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_type, time_range, sunday_parking_bool, attrition_rate, permit_rate, 
-                                 wkdy_hrly_rate, wkdy_daily_rate, wkdy_start_time, wkdy_end_time, 
-                                 wkend_hrly_rate,wkend_daily_rate, wkend_start_time, wkend_end_time):
+                                 wkdy_onstreet_hrly_rate, wkdy_offstreet_hrly_rate, wkdy_daily_rate, wkdy_start_time, wkdy_end_time,
+                                 wkend_onstreet_hrly_rate, wkend_offstreet_hrly_rate, wkend_daily_rate, wkend_start_time, wkend_end_time):
 
 # =============================================================================
 # 1. Load and summarize parking-duration data.
@@ -190,7 +190,9 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
 
     daily_sensitivity = 5
 
-    wkdy_revenue_df.loc["Hrly"] *= max(0,1-attrition_rate*wkdy_hrly_rate) * wkdy_hrly_rate
+    # All Day and 2h segments are on-street. Lot and Lot >2h are off-street
+    wkdy_revenue_df.loc["Hrly", ["All Day","2h"]] *= max(0,1-attrition_rate*wkdy_onstreet_hrly_rate) * wkdy_onstreet_hrly_rate
+    wkdy_revenue_df.loc["Hrly", ["Lot","Lot >2h"]] *= max(0,1-attrition_rate*wkdy_offstreet_hrly_rate) * wkdy_offstreet_hrly_rate
     wkdy_revenue_df.loc["Daily"] *= max(0,1-attrition_rate*wkdy_daily_effective_hrly_rate*daily_sensitivity) * wkdy_daily_rate
 
 
