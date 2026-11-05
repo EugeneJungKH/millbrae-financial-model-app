@@ -39,3 +39,5 @@
 14. **Sunday Enforcement Costs:** If Sunday paid parking is enabled, enforcement costs are increased using the adjustment specified in the model:
    - Existing RPP scenario: 152 / 144
    - Expanded RPP scenario: 200 / 192
+
+15. **Citation Revenue and Expenses:** Citation Revenue and Expenses are based on the average citation revenue and expenses in Millbrae from 2022 to 2025. These values remain static across all scenarios.

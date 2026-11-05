@@ -23,7 +23,7 @@ This file is primarily responsible for:
 import streamlit as st
 import plotly.graph_objects as go
 from datetime import time
-from calculations import financial_model_calculations
+from calculationv2 import financial_model_calculations
 from excel_export import build_excel_file
 
 # =============================================================================
@@ -32,15 +32,18 @@ from excel_export import build_excel_file
 DASHBOARD_TITLE = "Downtown Millbrae Financial Model Dashboard"
 DAILY_MAX_MULTIPLIER = 4
 REVENUE_COLUMNS = [
+    "Citation Revenue",
     "Hrly Revenue",
     "Daily Revenue",
     "Permit Revenue",
     "RPP Revenue",
 ]
 EXPENSE_COLUMNS = [
+    "Citation Expenses",
     "Enforcement Costs",
     "Parking Mngmt Costs",
     "CapEX",
+
 ]
 CURRENCY_COLUMNS = REVENUE_COLUMNS + EXPENSE_COLUMNS + [
     "Total Revenue",
@@ -53,9 +56,11 @@ COLUMN_COLORS = {
     "Daily Revenue": "#83C9FF",
     "Permit Revenue": "#FF2B2B",
     "RPP Revenue": "#FFABAB",
+    "Citation Revenue": "#bfef45",
     "Enforcement Costs": "#29B09D",
     "Parking Mngmt Costs": "#7DEFA1",
     "CapEX": "#FF8700",
+    "Citation Expenses": "#911eb4",
 }
 # =============================================================================
 # PAGE HEADER
@@ -150,7 +155,7 @@ with st.sidebar:
     weekday_offstreet_hourly_rate = st.number_input(
         "Off-Street Hourly Rate ($/hr)",
         min_value=0.00,
-        value=1.50,
+        value=1.00,
         step=0.25,
     )
 
@@ -189,8 +194,17 @@ with st.sidebar:
 
         attrition_rate = st.number_input(
             "Attrition Rate (% per $1 increase)",
-            value=0.15,
+            value=15,
         )
+
+        inhouse_scaling_factor = st.number_input(
+                    "In House Scaling Factor (%)",
+                    value=5,
+                )
+        inhouse_scaling_factor = 1 + (inhouse_scaling_factor / 100)
+
+        # convert attrition rate from percentage to decimal
+        attrition_rate = attrition_rate / 100
 
         time_range = st.radio(
             "Analysis Period (years)",
@@ -237,6 +251,7 @@ yearly_results = financial_model_calculations(
     weekend_daily_rate,
     weekend_start_hour,
     weekend_end_hour,
+    inhouse_scaling_factor
 )
 
 
@@ -322,7 +337,7 @@ for _, row in yearly_results.iterrows():
         ),
         text=net_income_label,
         showarrow=False,
-        yshift=15,
+        yshift=40,
         font=dict(size=12),
     )
 

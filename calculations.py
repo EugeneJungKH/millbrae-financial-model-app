@@ -17,7 +17,7 @@ Model process:
 4. Apply parking-rate attrition.
 5. Annualize revenue using ULI monthly factors.
 6. Calculate revenue
-7. Calucalte Expenses
+7. Caluclate Expenses
 """
 
 # import packages
@@ -121,10 +121,16 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     sat_permit_count = seg_TO_sum_clean_lots[seg_TO_sum_clean_lots["DOW"] == "Sat"][["All Day","2h","2h Free","Lot"]].sum(numeric_only=True).sum()
     thu_permit_count = seg_TO_sum_clean_lots[seg_TO_sum_clean_lots["DOW"] == "Thu"][["All Day","2h","2h Free","Lot"]].sum(numeric_only=True).sum()
 
+    # calculate the number of people parking more than 6 hours for weekday and weekend
+    seg_TO_sum_daily_rate = seg_TO_sum_clean[(seg_TO_sum_clean["hrs_parked"]>4)&(seg_TO_sum_clean["hrs_parked"]<6)]
+    wkdy_daily_count = seg_TO_sum_daily_rate[seg_TO_sum_daily_rate["DOW"] == "Thu"][["All Day","2h","2h Free","Lot"]].sum(numeric_only=True).sum()
+    wkend_daily_count = seg_TO_sum_daily_rate[seg_TO_sum_daily_rate["DOW"] == "Sat"][["All Day","2h","2h Free","Lot"]].sum(numeric_only=True).sum()
+
+
     # choose more conservative estimate for permit parkers
     permit_count = min(sat_permit_count, thu_permit_count)
 
-    # adjust the permit count assuming 80% of workers are present on thhursday
+    # adjust the permit count assuming 80% of workers are present on thursday
     permit_count_adjusted = round(permit_count / 0.8)
     permit_count_adjusted
     
@@ -196,12 +202,14 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     # All Day and 2h segments are on-street. Lot and Lot >2h are off-street
     wkdy_revenue_df.loc["Hrly", ["All Day","2h"]] *= max(0,1-attrition_rate*wkdy_onstreet_hrly_rate) * wkdy_onstreet_hrly_rate
     wkdy_revenue_df.loc["Hrly", ["Lot","Lot >2h"]] *= max(0,1-attrition_rate*wkdy_offstreet_hrly_rate) * wkdy_offstreet_hrly_rate
-    wkdy_revenue_df.loc["Daily"] *= max(0,1-attrition_rate*wkdy_daily_effective_hrly_rate*daily_sensitivity) * wkdy_daily_rate
-
+    wkdy_daily_revenue = max(0,1-attrition_rate*wkdy_daily_effective_hrly_rate*daily_sensitivity)* wkdy_daily_rate * wkdy_daily_count
     wkdy_revenue = wkdy_revenue_df.sum(axis=1)
 
     # add up weekend revenue
-    # @EugeneJungKH repeat the weekday calculations for weekend
+    # @EugeneJungKH repeat the weekday calculations for weekend (DONE)
+    wkend_revenue_df.loc["Hrly", ["All Day","2h"]] *= max(0,1-attrition_rate*wkend_onstreet_hrly_rate) * wkend_onstreet_hrly_rate
+    wkend_revenue_df.loc["Hrly", ["Lot","Lot >2h"]] *= max(0,1-attrition_rate*wkend_offstreet_hrly_rate) * wkend_offstreet_hrly_rate
+    wkend_daily_revenue = max(0,1-attrition_rate*wkend_daily_effective_hrly_rate*daily_sensitivity)* wkend_daily_rate * wkend_daily_count
     wkend_revenue = wkend_revenue_df.sum(axis=1)
 
 # =============================================================================
@@ -212,19 +220,16 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     ULI_df = pd.read_excel(r"data/ULI Factors.xlsx")
     monthly_df = ULI_df.copy()
     monthly_df["wkdy_revenue_hrly"] = wkdy_revenue.iloc[0]
-    monthly_df["wkdy_revenue_daily"] = wkdy_revenue.iloc[1]
     monthly_df["wkend_revenue_hrly"] = wkend_revenue.iloc[0]
-    monthly_df["wkend_revenue_daily"] = wkend_revenue.iloc[1]
     monthly_df["Monthly Weekday Revenue_hrly"] = monthly_df["wkdy_revenue_hrly"] * 5/7 * monthly_df["Days in the Month"] * monthly_df["Multiplying Factor"]
-    monthly_df["Monthly Weekday Revenue_daily"] = monthly_df["wkdy_revenue_daily"] * 5/7 * monthly_df["Days in the Month"] * monthly_df["Multiplying Factor"]
+    wkdy_daily_revenue_month = wkdy_daily_revenue * 5/7 * monthly_df["Days in the Month"] * monthly_df["Multiplying Factor"]
     monthly_df["Monthly Weekend Revenue_hrly"] = monthly_df["wkend_revenue_hrly"] * (sunday_parking_bool+1)/7 * monthly_df["Days in the Month"] * monthly_df["Multiplying Factor"]
-    monthly_df["Monthly Weekend Revenue_daily"] = monthly_df["wkend_revenue_daily"] * (sunday_parking_bool+1)/7 * monthly_df["Days in the Month"] * monthly_df["Multiplying Factor"]
+    wkend_daily_revenue_month = wkend_daily_revenue * (sunday_parking_bool+1)/7 * monthly_df["Days in the Month"] * monthly_df["Multiplying Factor"]
 
     monthly_df["Total Monthly Revenue_hrly"] = monthly_df["Monthly Weekday Revenue_hrly"] + monthly_df["Monthly Weekend Revenue_hrly"]
-    monthly_df["Total Monthly Revenue_daily"] = monthly_df["Monthly Weekday Revenue_daily"] + monthly_df["Monthly Weekend Revenue_daily"]
 
     year_one_revenue_hrly = monthly_df["Total Monthly Revenue_hrly"].sum()
-    year_one_revenue_daily = monthly_df["Total Monthly Revenue_daily"].sum()
+    year_one_revenue_daily = wkdy_daily_revenue_month.sum() + wkend_daily_revenue_month.sum()
 
 # =============================================================================
 # 6. Calculate Revenue
