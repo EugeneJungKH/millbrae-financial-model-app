@@ -79,7 +79,7 @@ def write_configuration(
         ("In-House Scaling Factor", f"{(inhouse_scaling_factor - 1) * 100:g}%"),
         ("Analysis Period", f"{analysis_period} years"),
         ("Sunday Parking", "Included" if sunday_parking_enabled else "Not included"),
-        ("Credit Card Processing Fee", "Enabled" if credit_card_processing_fee_enabled else "Not included"),
+        ("Credit Card Processing Fee", "Included" if credit_card_processing_fee_enabled else "Not included"),
         ("Percent of Transactions Made With Credit Card", f"{credit_card_percentage * 100:g}%"),
     ]
 
