@@ -183,7 +183,7 @@ with st.sidebar:
         )
 
         credit_card_processing_fee = st.checkbox(
-            "Enable Credit Card Processing Fee",
+            "Enable Credit Card Processing Fee (3%)",
             value=False,
         )
 
