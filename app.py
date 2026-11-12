@@ -26,46 +26,11 @@ from datetime import time
 from calculationv2 import financial_model_calculations
 from excel_export import build_excel_file
 
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
-DASHBOARD_TITLE = "Downtown Millbrae Financial Model Dashboard"
-DAILY_MAX_MULTIPLIER = 4
-REVENUE_COLUMNS = [
-    "Citation Revenue",
-    "Hrly Revenue",
-    "Daily Revenue",
-    "Permit Revenue",
-    "RPP Revenue",
-]
-EXPENSE_COLUMNS = [
-    "Citation Expenses",
-    "Enforcement Costs",
-    "Parking Mngmt Costs",
-    "CapEX",
 
-]
-CURRENCY_COLUMNS = REVENUE_COLUMNS + EXPENSE_COLUMNS + [
-    "Total Revenue",
-    "Total Expenses",
-    "Net Income",
-]
-# Streamlit's default light theme chart colors, used for the Excel chart.
-COLUMN_COLORS = {
-    "Hrly Revenue": "#0068C9",
-    "Daily Revenue": "#83C9FF",
-    "Permit Revenue": "#FF2B2B",
-    "RPP Revenue": "#FFABAB",
-    "Citation Revenue": "#bfef45",
-    "Enforcement Costs": "#29B09D",
-    "Parking Mngmt Costs": "#7DEFA1",
-    "CapEX": "#FF8700",
-    "Citation Expenses": "#911eb4",
-}
 # =============================================================================
 # PAGE HEADER
 # =============================================================================
-st.title(DASHBOARD_TITLE)
+st.title("Downtown Millbrae Financial Model Dashboard")
 st.write(
     """
     This dashboard simulates different parking financial scenarios for
@@ -160,6 +125,7 @@ with st.sidebar:
     )
 
     # The daily maximum is derived from the off-street hourly rate.
+    DAILY_MAX_MULTIPLIER = 4
     weekday_daily_rate = DAILY_MAX_MULTIPLIER * weekday_offstreet_hourly_rate
 
     st.caption(
@@ -216,6 +182,61 @@ with st.sidebar:
             value=False,
         )
 
+        credit_card_processing_fee = st.checkbox(
+            "Enable Credit Card Processing Fee",
+            value=False,
+        )
+
+        credit_card_percentage = 0
+
+        if credit_card_processing_fee:
+            credit_card_percentage = st.number_input(
+                "Percent of Transactions Made With Credit Card (%)",
+                value=50,
+            )
+            credit_card_percentage = credit_card_percentage / 100
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+REVENUE_COLUMNS = [
+    "Citation Revenue",
+    "Hrly Revenue",
+    "Daily Revenue",
+    "Permit Revenue",
+    "RPP Revenue",
+]
+EXPENSE_COLUMNS = [
+    "Citation Expenses",
+    "Enforcement Costs",
+    "Parking Mngmt Costs",
+    "CapEX",
+    "Credit Card Processing Fee",
+]
+
+# add credit card processing fee to the list of expense columns if enable credit card processing fee is selected
+if not credit_card_processing_fee:
+    EXPENSE_COLUMNS.remove("Credit Card Processing Fee")
+
+CURRENCY_COLUMNS = REVENUE_COLUMNS + EXPENSE_COLUMNS + [
+    "Total Revenue",
+    "Total Expenses",
+    "Net Income",
+]
+# Streamlit's default light theme chart colors, used for the Excel chart.
+COLUMN_COLORS = {
+    "Hrly Revenue": "#0068C9",
+    "Daily Revenue": "#83C9FF",
+    "Permit Revenue": "#FF2B2B",
+    "RPP Revenue": "#FFABAB",
+    "Citation Revenue": "#bfef45",
+    "Enforcement Costs": "#29B09D",
+    "Parking Mngmt Costs": "#7DEFA1",
+    "CapEX": "#FF8700",
+    "Citation Expenses": "#911eb4",
+    "Credit Card Processing Fee": "#FF69B4",
+}
+
 # =============================================================================
 # MAP
 # =============================================================================
@@ -251,40 +272,10 @@ yearly_results = financial_model_calculations(
     weekend_daily_rate,
     weekend_start_hour,
     weekend_end_hour,
-    inhouse_scaling_factor
+    inhouse_scaling_factor,
+    credit_card_processing_fee,
+    credit_card_percentage
 )
-
-
-# =============================================================================
-# RESULTS TABLE
-# =============================================================================
-
-st.download_button(
-    "Download Excel File",
-    data=build_excel_file(
-        yearly_results,
-        REVENUE_COLUMNS,
-        EXPENSE_COLUMNS,
-        CURRENCY_COLUMNS,
-        COLUMN_COLORS,
-    ),
-    file_name="millbrae_financial_summary.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-)
-
-st.subheader("Financial Summary")
-
-column_configuration = {
-    column: st.column_config.NumberColumn(format="dollar")
-    for column in CURRENCY_COLUMNS
-}
-
-st.dataframe(
-    yearly_results.set_index("Years"),
-    column_config=column_configuration,
-    use_container_width=True,
-)
-
 
 # =============================================================================
 # REVENUE AND EXPENSE CHART
@@ -352,4 +343,53 @@ fig.update_layout(
 st.plotly_chart(
     fig,
     use_container_width=True,
+)
+
+# =============================================================================
+# RESULTS TABLE
+# =============================================================================
+
+st.subheader("Financial Summary")
+
+column_configuration = {
+    column: st.column_config.NumberColumn(format="dollar")
+    for column in CURRENCY_COLUMNS
+}
+
+st.dataframe(
+    yearly_results.set_index("Years"),
+    column_config=column_configuration,
+    use_container_width=True,
+)
+
+# =============================================================================
+# Download Button
+# =============================================================================
+
+st.download_button(
+    "Download Excel File",
+    data=build_excel_file(
+        yearly_results,
+        REVENUE_COLUMNS,
+        EXPENSE_COLUMNS,
+        CURRENCY_COLUMNS,
+        COLUMN_COLORS,
+        parking_operator,
+        rpp_mode,
+        meter_type,
+        weekday_start_hour,
+        weekday_end_hour,
+        weekday_onstreet_hourly_rate,
+        weekday_offstreet_hourly_rate,
+        permit_rate,
+        rpp_price,
+        attrition_rate,
+        inhouse_scaling_factor,
+        time_range,
+        sunday_parking_enabled,
+        credit_card_processing_fee,
+        credit_card_percentage,
+    ),
+    file_name="Millbrae Financial Model Export.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )

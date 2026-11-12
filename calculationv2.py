@@ -49,7 +49,8 @@ FUNCTION 2. MAIN CALCULATIONS
 
 def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_type, time_range, sunday_parking_bool, attrition_rate, permit_rate, 
                                  wkdy_onstreet_hrly_rate, wkdy_offstreet_hrly_rate, wkdy_daily_rate, wkdy_start_time, wkdy_end_time,
-                                 wkend_onstreet_hrly_rate, wkend_offstreet_hrly_rate, wkend_daily_rate, wkend_start_time, wkend_end_time, inhouse_scaling_factor):
+                                 wkend_onstreet_hrly_rate, wkend_offstreet_hrly_rate, wkend_daily_rate, wkend_start_time, wkend_end_time, inhouse_scaling_factor, credit_card_processing_fee,
+                                credit_card_percentage):
     # read in raw count data
     raw_counts_df = pd.read_excel(r"data/Segments Pricing Calculations 06192024.xlsx", sheet_name="Raw")
 
@@ -110,8 +111,11 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     sat_daily_count = key_counts_adj_df_sat[["All Day","2h Free","Lot"]][(key_counts_adj_df_sat["hrs_parked"] > 4)&(key_counts_adj_df_sat["hrs_parked"] <= 6)].sum(numeric_only=True).sum() + key_counts_adj_df_sat["2h"][(key_counts_adj_df_sat["hrs_parked"] > 2)&(key_counts_adj_df_sat["hrs_parked"] <= 6)].sum(numeric_only=True).sum()
 
     # apply attrition to count and caluclate revenue
-    thu_daily_revenue = thu_daily_count * max(0,1-attrition_rate*wkdy_onstreet_hrly_rate) * wkdy_daily_rate
-    sat_daily_revenue = sat_daily_count * max(0,1-attrition_rate*wkend_onstreet_hrly_rate) * wkend_daily_rate
+    thu_daily_adj = thu_daily_count * max(0,1-attrition_rate*wkdy_onstreet_hrly_rate) 
+    sat_daily_adj = sat_daily_count * max(0,1-attrition_rate*wkend_onstreet_hrly_rate)
+
+    thu_daily_revenue = thu_daily_adj * wkdy_daily_rate
+    sat_daily_revenue = sat_daily_adj * wkend_daily_rate
 
     # =============================================================================
     """
@@ -155,8 +159,8 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     thu_hrly_revenue_lot = thu_hrly_veh_hrs_lot * max(0,1-attrition_rate*wkdy_offstreet_hrly_rate) * wkdy_offstreet_hrly_rate
     thu_hrly_revenue_street = thu_hrly_veh_hrs_street * max(0,1-attrition_rate*wkdy_onstreet_hrly_rate) * wkdy_onstreet_hrly_rate
 
-    sat_hrly_veh_hrs_lot = sat_hrly_veh_hrs_lot * max(0,1-attrition_rate*wkdy_offstreet_hrly_rate) * wkdy_offstreet_hrly_rate
-    sat_hrly_veh_hrs_street = sat_hrly_veh_hrs_street * max(0,1-attrition_rate*wkdy_onstreet_hrly_rate) * wkdy_onstreet_hrly_rate
+    sat_hrly_veh_hrs_lot = sat_hrly_veh_hrs_lot * max(0,1-attrition_rate*wkend_offstreet_hrly_rate) * wkend_offstreet_hrly_rate
+    sat_hrly_veh_hrs_street = sat_hrly_veh_hrs_street * max(0,1-attrition_rate*wkend_onstreet_hrly_rate) * wkend_onstreet_hrly_rate
 
     # calculate total revenues
     thu_hrly_revenue = thu_hrly_revenue_lot + thu_hrly_revenue_street
@@ -245,19 +249,30 @@ def financial_model_calculations(parking_operator, RPP_mode, rpp_price, meter_ty
     elif (sunday_parking_bool == True)&(RPP_mode == "Expanded"):
         enforcement_cost = enforcement_cost * 200/192
 
+
     # calculate year of year increase
     yoy_increase = expense_scenario["YOY Increase"].iloc[0] + 1
 
     # citation cost (from real world data)
     citation_cost = 19090.15 # this is static and based on real data
 
+
     # add costs to df
     yearly_revenue_expenses["Enforcement Costs"] = (enforcement_cost* (yoy_increase ** year_index))
     yearly_revenue_expenses["Parking Mngmt Costs"] = (parking_mgmt_cost * (yoy_increase ** year_index))
     yearly_revenue_expenses["Citation Expenses"] = (citation_cost * (yoy_increase ** year_index))
 
+    # include transaction costs if it is selected by user
+    if (credit_card_processing_fee == True):
+        credit_card_processing_fee_yrly = (hrly_revenue_yr + daily_revenue_yr) * credit_card_percentage * 0.03
+        yearly_revenue_expenses["Credit Card Processing Fee"] = credit_card_processing_fee_yrly
+        yearly_revenue_expenses["Total Expenses"] = yearly_revenue_expenses["Enforcement Costs"] + yearly_revenue_expenses["Parking Mngmt Costs"] + yearly_revenue_expenses["CapEX"] + yearly_revenue_expenses["Citation Expenses"] + yearly_revenue_expenses["Credit Card Processing Fee"] 
+    else:
+        yearly_revenue_expenses["Credit Card Processing Fee"] = 0
+        yearly_revenue_expenses["Total Expenses"] = yearly_revenue_expenses["Enforcement Costs"] + yearly_revenue_expenses["Parking Mngmt Costs"] + yearly_revenue_expenses["CapEX"] + yearly_revenue_expenses["Citation Expenses"]
+    
+
     # calculate total expense and net income
-    yearly_revenue_expenses["Total Expenses"] = yearly_revenue_expenses["Enforcement Costs"] + yearly_revenue_expenses["Parking Mngmt Costs"] + yearly_revenue_expenses["CapEX"] + yearly_revenue_expenses["Citation Expenses"]
     yearly_revenue_expenses["Net Income"] = yearly_revenue_expenses["Total Revenue"] - yearly_revenue_expenses["Total Expenses"]
 
     return yearly_revenue_expenses
