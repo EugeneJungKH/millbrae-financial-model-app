@@ -24,26 +24,90 @@ def format_net_income(net_income):
     return f"${net_income:,.0f}"
 
 
-def write_summary_table(workbook, worksheet, yearly_results, currency_columns):
+def format_hour(hour):
+    """Format an integer hour in 12-hour time."""
+
+    return f"{hour % 12 or 12}:00 {'AM' if hour < 12 else 'PM'}"
+
+
+def write_configuration(
+    workbook,
+    worksheet,
+    parking_operator,
+    rpp_mode,
+    meter_type,
+    weekday_start_hour,
+    weekday_end_hour,
+    onstreet_hourly_rate,
+    offstreet_hourly_rate,
+    permit_rate,
+    rpp_rate,
+    attrition_rate,
+    inhouse_scaling_factor,
+    analysis_period,
+    sunday_parking_enabled,
+    credit_card_processing_fee_enabled,
+    credit_card_percentage,
+):
+    """Write the selected parking configuration and return the summary table's start row."""
+
+    title_format = workbook.add_format({"bold": True, "font_size": 14})
+    label_format = workbook.add_format({"bold": True})
+
+    worksheet.write(0, 0, "Parking Configuration", title_format)
+
+    configuration = [
+        ("Parking Operator", parking_operator),
+        ("RPP Mode", rpp_mode),
+        ("Paystation Type", meter_type),
+        ("Hours of Operation", f"{format_hour(weekday_start_hour)} - {format_hour(weekday_end_hour)}"),
+        ("On-Street Hourly Rate ($/hr)", f"${onstreet_hourly_rate:,.2f}"),
+        ("Off-Street Hourly Rate ($/hr)", f"${offstreet_hourly_rate:,.2f}"),
+        ("Monthly Permit Rate ($/month)", f"${permit_rate:,.2f}"),
+        ("Annual RPP Rate ($/year)", f"${rpp_rate:,.2f}"),
+    ]
+
+    for row_index, (label, value) in enumerate(configuration, start=1):
+        worksheet.write(row_index, 0, label, label_format)
+        worksheet.write(row_index, 1, value)
+
+    settings_title_row = len(configuration) + 2
+    worksheet.write(settings_title_row, 0, "Advanced Settings", title_format)
+
+    settings = [
+        ("Attrition Rate (% per $1 increase)", f"{attrition_rate * 100:g}%"),
+        ("In-House Scaling Factor", f"{(inhouse_scaling_factor - 1) * 100:g}%"),
+        ("Analysis Period", f"{analysis_period} years"),
+        ("Sunday Parking", "Included" if sunday_parking_enabled else "Not included"),
+        ("Credit Card Processing Fee", "Enabled" if credit_card_processing_fee_enabled else "Not included"),
+        ("Percent of Transactions Made With Credit Card", f"{credit_card_percentage * 100:g}%"),
+    ]
+
+    for row_index, (label, value) in enumerate(settings, start=settings_title_row + 1):
+        worksheet.write(row_index, 0, label, label_format)
+        worksheet.write(row_index, 1, value)
+
+    return settings_title_row + len(settings) + 2
+
+
+def write_summary_table(workbook, worksheet, yearly_results, currency_columns, start_row=0):
     """Write the financial summary table and return the number of rows used."""
 
     header_format = workbook.add_format({"bold": True, "bottom": 1, "align": "center", "text_wrap": True})
     currency_format = workbook.add_format({"num_format": "$#,##0.00"})
 
     for column_index, column in enumerate(yearly_results.columns):
-        worksheet.write(0, column_index, column, header_format)
+        worksheet.write(start_row, column_index, column, header_format)
 
         for row_index, value in enumerate(yearly_results[column], start=1):
             if column in currency_columns:
-                worksheet.write_number(row_index, column_index, float(value), currency_format)
+                worksheet.write_number(start_row + row_index, column_index, float(value), currency_format)
             else:
-                worksheet.write_number(row_index, column_index, int(value))
+                worksheet.write_number(start_row + row_index, column_index, int(value))
 
     worksheet.set_column(0, 0, 8)
     worksheet.set_column(1, len(yearly_results.columns) - 1, 15)
-    worksheet.freeze_panes(1, 1)
-
-    return len(yearly_results) + 1
+    return start_row + len(yearly_results) + 1
 
 
 def write_chart_data(workbook, worksheet, yearly_results, revenue_columns, expense_columns):
@@ -90,7 +154,28 @@ def write_chart_data(workbook, worksheet, yearly_results, revenue_columns, expen
     return net_income_labels
 
 
-def build_excel_file(yearly_results, revenue_columns, expense_columns, currency_columns, column_colors):
+def build_excel_file(
+    yearly_results,
+    revenue_columns,
+    expense_columns,
+    currency_columns,
+    column_colors,
+    parking_operator,
+    rpp_mode,
+    meter_type,
+    weekday_start_hour,
+    weekday_end_hour,
+    onstreet_hourly_rate,
+    offstreet_hourly_rate,
+    permit_rate,
+    rpp_rate,
+    attrition_rate,
+    inhouse_scaling_factor,
+    analysis_period,
+    sunday_parking_enabled,
+    credit_card_processing_fee_enabled,
+    credit_card_percentage,
+):
     """Return an Excel workbook of the summary table and chart as bytes."""
 
     output = BytesIO()
@@ -98,7 +183,28 @@ def build_excel_file(yearly_results, revenue_columns, expense_columns, currency_
     summary_sheet = workbook.add_worksheet(SUMMARY_SHEET)
     chart_data_sheet = workbook.add_worksheet(CHART_DATA_SHEET)
 
-    table_rows = write_summary_table(workbook, summary_sheet, yearly_results, currency_columns)
+    table_start_row = write_configuration(
+        workbook,
+        summary_sheet,
+        parking_operator,
+        rpp_mode,
+        meter_type,
+        weekday_start_hour,
+        weekday_end_hour,
+        onstreet_hourly_rate,
+        offstreet_hourly_rate,
+        permit_rate,
+        rpp_rate,
+        attrition_rate,
+        inhouse_scaling_factor,
+        analysis_period,
+        sunday_parking_enabled,
+        credit_card_processing_fee_enabled,
+        credit_card_percentage,
+    )
+    table_rows = write_summary_table(workbook, summary_sheet, yearly_results, currency_columns, table_start_row)
+    summary_sheet.set_column(0, 0, 32)
+    summary_sheet.set_column(1, 1, 30)
     net_income_labels = write_chart_data(workbook, chart_data_sheet, yearly_results, revenue_columns, expense_columns)
 
     chart_columns = revenue_columns + expense_columns
