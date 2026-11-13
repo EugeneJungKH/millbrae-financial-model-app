@@ -41,3 +41,5 @@
    - Expanded RPP scenario: 200 / 192
 
 15. **Citation Revenue and Expenses:** Citation Revenue and Expenses are based on the average citation revenue and expenses in Millbrae from 2022 to 2025. These values remain static across all scenarios.
+
+16. **Credit Card Transaction Expenses:** Credit card transaction expenses are only calculated off daily and hourly parking revenue. It is calculated by multiplying the sum of daily and hourly parking revenue by the percent of transactions that are made with a credit card variable by the credit card processing fee which is assumed to be 3%.
